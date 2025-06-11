@@ -5,8 +5,8 @@ import '../models/todo.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lottie/lottie.dart';
-import 'package:provider/provider.dart'; // Import Provider
-import '../providers/theme_provider.dart'; // Import ThemeProvider Anda
+import 'package:provider/provider.dart';
+import '../providers/theme_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -56,7 +56,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // Fungsi untuk mengubah status selesai/belum selesai
   void _toggleTodoStatus(Todo todo) async {
     await todosRef.doc(todo.id).update({'isCompleted': !todo.isCompleted});
   }
@@ -72,11 +71,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _addOrEditTodo({Todo? existingTodo}) {
     final titleController = TextEditingController(text: existingTodo?.title);
-    final descController = TextEditingController(
-      text: existingTodo?.description,
-    );
+    final descController = TextEditingController(text: existingTodo?.description);
 
-    // Akses tema saat ini dari Theme.of(context)
+    TimeOfDay selectedTime = existingTodo != null
+        ? TimeOfDay.fromDateTime(existingTodo.date)
+        : TimeOfDay.now();
+
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -85,9 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (_) => AlertDialog(
         title: Text(
           existingTodo == null ? 'Tambah Kegiatan' : 'Edit Kegiatan',
-          style: TextStyle(
-            color: colorScheme.primary,
-          ), // Gunakan primary color dari ColorScheme
+          style: TextStyle(color: colorScheme.primary),
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         content: Column(
@@ -98,9 +96,9 @@ class _HomeScreenState extends State<HomeScreen> {
               decoration: InputDecoration(
                 labelText: 'Judul',
                 border: const OutlineInputBorder(),
-                labelStyle: textTheme.bodyLarge, // Gunakan gaya teks dari tema
+                labelStyle: textTheme.bodyLarge,
               ),
-              style: textTheme.bodyMedium, // Gunakan gaya teks dari tema
+              style: textTheme.bodyMedium,
             ),
             const SizedBox(height: 12),
             TextField(
@@ -108,33 +106,55 @@ class _HomeScreenState extends State<HomeScreen> {
               decoration: InputDecoration(
                 labelText: 'Deskripsi',
                 border: const OutlineInputBorder(),
-                labelStyle: textTheme.bodyLarge, // Gunakan gaya teks dari tema
+                labelStyle: textTheme.bodyLarge,
               ),
-              style: textTheme.bodyMedium, // Gunakan gaya teks dari tema
+              style: textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            TextButton.icon(
+              icon: const Icon(Icons.access_time),
+              label: Text(
+                'Pilih Waktu: ${selectedTime.format(context)}',
+                style: textTheme.bodyMedium,
+              ),
+              onPressed: () async {
+                final pickedTime = await showTimePicker(
+                  context: context,
+                  initialTime: selectedTime,
+                );
+                if (pickedTime != null) {
+                  setState(() => selectedTime = pickedTime);
+                }
+              },
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Batal',
-              style: TextStyle(color: colorScheme.primary),
-            ), // Gunakan primary color
+            child: Text('Batal', style: TextStyle(color: colorScheme.primary)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: colorScheme.primary,
-            ), // Gunakan primary color
+            ),
             onPressed: () async {
               final title = titleController.text.trim();
               final desc = descController.text.trim();
               if (title.isEmpty || desc.isEmpty) return;
 
+              final dateTimeWithTime = DateTime(
+                _selectedDate.year,
+                _selectedDate.month,
+                _selectedDate.day,
+                selectedTime.hour,
+                selectedTime.minute,
+              );
+
               final todoData = {
                 'title': title,
                 'description': desc,
-                'date': _selectedDate.toIso8601String(),
+                'date': dateTimeWithTime.toIso8601String(),
                 'isCompleted': existingTodo?.isCompleted ?? false,
               };
 
@@ -144,16 +164,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 await todosRef.doc(existingTodo.id).update(todoData);
               }
 
-              Navigator.pop(context);
+              if (mounted) Navigator.pop(context);
             },
-            child: const Text(
-              // Teks tombol akan menggunakan warna kontras otomatis dari ElevatedButton
-              // berdasarkan primary color tema
-              'Simpan',
-              style: TextStyle(
-                color: Colors.white,
-              ), // Tetap putih untuk kontras yang baik
-            ),
+            child: const Text('Simpan', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -161,52 +174,43 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _formatDate(DateTime date) {
-    return "${date.day}/${date.month}/${date.year}";
+    return "${date.day}/${date.month}/${date.year} "
+        "${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
   }
 
   @override
   Widget build(BuildContext context) {
     final allTodos = _getAllTodos();
-    // Dapatkan ThemeProvider
     final themeProvider = Provider.of<ThemeProvider>(context);
-    // Dapatkan data tema saat ini dari Theme.of(context)
     final currentTheme = Theme.of(context);
     final colorScheme = currentTheme.colorScheme;
     final textTheme = currentTheme.textTheme;
 
     return Scaffold(
-      backgroundColor: currentTheme
-          .scaffoldBackgroundColor, // Gunakan warna latar belakang scaffold dari tema
+      backgroundColor: currentTheme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: colorScheme.primary, // Gunakan primary color dari tema
+        backgroundColor: colorScheme.primary,
         title: Row(
           children: [
             SizedBox(
               width: 32,
               height: 32,
-              child: Lottie.asset(
-                'assets/animations/splash.json',
-                fit: BoxFit.cover,
-              ),
+              child: Lottie.asset('assets/animations/splash.json', fit: BoxFit.cover),
             ),
             const SizedBox(width: 8),
             Text(
               'TaskFlow',
-              style: textTheme.titleLarge?.copyWith(
-                color: Colors.white,
-              ), // Sesuaikan warna teks judul App Bar
+              style: textTheme.titleLarge?.copyWith(color: Colors.white),
             ),
           ],
         ),
         actions: [
-          // Tombol Pengalih Tema
           IconButton(
             icon: Icon(
               themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode,
               color: Colors.white,
             ),
             onPressed: () {
-              // Panggil toggleTheme dengan nilai bool
               themeProvider.toggleTheme(!themeProvider.isDarkMode);
             },
           ),
@@ -228,17 +232,15 @@ class _HomeScreenState extends State<HomeScreen> {
             firstDay: DateTime.utc(2020),
             lastDay: DateTime.utc(2030),
             selectedDayPredicate: (day) => isSameDay(day, _selectedDate),
-            onDaySelected: (selected, focused) =>
+            onDaySelected: (selected, _) =>
                 setState(() => _selectedDate = selected),
             calendarStyle: CalendarStyle(
               todayDecoration: BoxDecoration(
-                color: colorScheme.primary.withOpacity(
-                  0.4,
-                ), // Gunakan primary color
+                color: colorScheme.primary.withOpacity(0.4),
                 shape: BoxShape.circle,
               ),
               selectedDecoration: BoxDecoration(
-                color: colorScheme.primary, // Gunakan primary color
+                color: colorScheme.primary,
                 shape: BoxShape.circle,
               ),
               markerDecoration: const BoxDecoration(
@@ -246,7 +248,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 shape: BoxShape.circle,
               ),
               markersMaxCount: 1,
-              // Sesuaikan gaya teks untuk kalender agar sesuai dengan tema
               defaultTextStyle: textTheme.bodyMedium!,
               weekendTextStyle: textTheme.bodyMedium!,
               selectedTextStyle: const TextStyle(color: Colors.white),
@@ -257,14 +258,12 @@ class _HomeScreenState extends State<HomeScreen> {
               titleCentered: true,
               titleTextStyle: textTheme.titleMedium!.copyWith(
                 color: textTheme.bodyMedium?.color,
-              ), // Sesuaikan warna judul header
+              ),
             ),
             daysOfWeekHeight: 20,
             daysOfWeekStyle: DaysOfWeekStyle(
-              weekdayStyle:
-                  textTheme.bodySmall!, // Sesuaikan warna teks hari kerja
-              weekendStyle:
-                  textTheme.bodySmall!, // Sesuaikan warna teks akhir pekan
+              weekdayStyle: textTheme.bodySmall!,
+              weekendStyle: textTheme.bodySmall!,
             ),
             calendarBuilders: CalendarBuilders(
               markerBuilder: (context, day, events) {
@@ -289,12 +288,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 8),
           Expanded(
             child: allTodos.isEmpty
-                ? Center(
-                    child: Text(
-                      'Tidak ada kegiatan.',
-                      style: textTheme.bodyMedium,
-                    ),
-                  ) // Terapkan gaya teks
+                ? Center(child: Text('Tidak ada kegiatan.', style: textTheme.bodyMedium))
                 : ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: allTodos.length,
@@ -302,8 +296,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       final todo = allTodos[i];
 
                       return Card(
-                        color: currentTheme
-                            .cardColor, // Terapkan warna latar belakang kartu dari tema
+                        color: currentTheme.cardColor,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
@@ -318,9 +311,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 onChanged: (value) {
                                   _toggleTodoStatus(todo);
                                 },
-                                activeColor: colorScheme
-                                    .primary, // Gunakan primary color
-                                checkColor: Colors.white, // Warna tanda centang
+                                activeColor: colorScheme.primary,
+                                checkColor: Colors.white,
                               ),
                               Expanded(
                                 child: Column(
@@ -331,9 +323,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       style: textTheme.titleMedium?.copyWith(
                                         color: todo.isCompleted
                                             ? Colors.grey
-                                            : textTheme
-                                                  .titleMedium
-                                                  ?.color, // Sesuaikan warna
+                                            : textTheme.titleMedium?.color,
                                         decoration: todo.isCompleted
                                             ? TextDecoration.lineThrough
                                             : TextDecoration.none,
@@ -346,9 +336,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         color: todo.isCompleted
                                             ? Colors.grey
                                             : textTheme.bodyMedium?.color
-                                                  ?.withOpacity(
-                                                    0.7,
-                                                  ), // Sesuaikan warna
+                                                ?.withOpacity(0.7),
                                         decoration: todo.isCompleted
                                             ? TextDecoration.lineThrough
                                             : TextDecoration.none,
@@ -357,20 +345,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                     const SizedBox(height: 12),
                                     Row(
                                       children: [
-                                        Icon(
-                                          Icons.access_time,
-                                          size: 18,
-                                          color: colorScheme
-                                              .primary, // Gunakan primary color
-                                        ),
+                                        Icon(Icons.access_time, size: 18, color: colorScheme.primary),
                                         const SizedBox(width: 6),
                                         Text(
                                           "Deadline: ${_formatDate(todo.date)}",
                                           style: textTheme.bodySmall?.copyWith(
-                                            color: textTheme.bodySmall?.color
-                                                ?.withOpacity(
-                                                  0.8,
-                                                ), // Sesuaikan warna
+                                            color: textTheme.bodySmall?.color?.withOpacity(0.8),
                                           ),
                                         ),
                                       ],
@@ -379,18 +359,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ),
                               IconButton(
-                                icon: const Icon(
-                                  Icons.edit,
-                                  color: Colors.orange,
-                                ),
-                                onPressed: () =>
-                                    _addOrEditTodo(existingTodo: todo),
+                                icon: const Icon(Icons.edit, color: Colors.orange),
+                                onPressed: () => _addOrEditTodo(existingTodo: todo),
                               ),
                               IconButton(
-                                icon: const Icon(
-                                  Icons.delete,
-                                  color: Colors.red,
-                                ),
+                                icon: const Icon(Icons.delete, color: Colors.red),
                                 onPressed: () => todosRef.doc(todo.id).delete(),
                               ),
                             ],
@@ -403,12 +376,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: colorScheme.primary, // Gunakan primary color
+        backgroundColor: colorScheme.primary,
         onPressed: () => _addOrEditTodo(),
-        child: const Icon(
-          Icons.add,
-          color: Colors.white,
-        ), // Pastikan ikon terlihat
+        child: const Icon(Icons.add, color: Colors.white),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
